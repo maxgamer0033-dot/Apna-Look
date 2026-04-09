@@ -1046,8 +1046,8 @@ function OutfitSelection({ selection, setSelection, onContinue, onBack }: any) {
 function OutfitSuggestions({ combinations, currentIndex, setCurrentIndex, showVirtualTryOn, setShowVirtualTryOn, onBack }: any) {
   const current = combinations[currentIndex];
   
-  // Call Convex gemini action
-  const analyzeOutfit = useAction((api as any).gemini?.analyzeOutfit || "gemini:analyzeOutfit");
+  // Call Convex gemini action — api.gemini is confirmed in generated types
+  const analyzeOutfit = useAction(api.gemini.analyzeOutfit);
   const [analysisResult, setAnalysisResult] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
@@ -1064,8 +1064,10 @@ function OutfitSuggestions({ combinations, currentIndex, setCurrentIndex, showVi
       });
       setAnalysisResult(result);
     } catch (err: any) {
-      console.error(err);
-      setAnalysisResult("Cannot analyze outfit right now. Please ensure GEMINI_API_KEY is configured in the Convex dashboard.");
+      console.error("Virtual Try-On Error:", err);
+      // Show the actual error so we can debug it properly
+      const msg = err?.message || err?.data?.message || String(err);
+      setAnalysisResult(`<p style="color:#e11d48"><b>Error:</b> ${msg}</p><p style="margin-top:8px;color:#64748b">If this says GEMINI_API_KEY not set, run: <code>npx convex env set GEMINI_API_KEY YOUR_KEY</code></p>`);
     } finally {
       setIsAnalyzing(false);
     }
