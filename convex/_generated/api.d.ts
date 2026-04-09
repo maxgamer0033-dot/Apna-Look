@@ -11,6 +11,7 @@
 import type * as auth from "../auth.js";
 import type * as clothes from "../clothes.js";
 import type * as customers from "../customers.js";
+import type * as gemini from "../gemini.js";
 import type * as http from "../http.js";
 import type * as retailers from "../retailers.js";
 
@@ -24,6 +25,7 @@ declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   clothes: typeof clothes;
   customers: typeof customers;
+  gemini: typeof gemini;
   http: typeof http;
   retailers: typeof retailers;
 }>;
