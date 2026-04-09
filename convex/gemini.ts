@@ -20,22 +20,33 @@ export const analyzeOutfit = action({
       const parts: any[] = [];
       let prompt = "";
 
+      // Helper for Edge-compatible ArrayBuffer to base64 conversion
+      const bufferToBase64 = async (response: Response) => {
+        const buffer = await response.arrayBuffer();
+        const bytes = new Uint8Array(buffer);
+        let binary = "";
+        for (let i = 0; i < bytes.byteLength; i++) {
+          binary += String.fromCharCode(bytes[i]);
+        }
+        return btoa(binary);
+      };
+
       if (args.topUrl && args.bottomUrl) {
         prompt = "You are a professional fashion stylist. The user has selected these two items for an outfit. Analyze how well they go together. Respond in a friendly tone. Mention color matching, style, and suggestions for shoes/accessories. Format your response into readable HTML (using <b>, <ul>, <li>, <p>) without outer body tags.";
         
         const topResponse = await fetch(args.topUrl);
-        parts.push({ inlineData: { mimeType: topResponse.headers.get("content-type") || "image/jpeg", data: Buffer.from(await topResponse.arrayBuffer()).toString('base64') }});
+        parts.push({ inlineData: { mimeType: topResponse.headers.get("content-type") || "image/jpeg", data: await bufferToBase64(topResponse) }});
         
         const bottomResponse = await fetch(args.bottomUrl);
-        parts.push({ inlineData: { mimeType: bottomResponse.headers.get("content-type") || "image/jpeg", data: Buffer.from(await bottomResponse.arrayBuffer()).toString('base64') }});
+        parts.push({ inlineData: { mimeType: bottomResponse.headers.get("content-type") || "image/jpeg", data: await bufferToBase64(bottomResponse) }});
       } else if (args.topUrl) {
         prompt = "You are a professional fashion stylist. The user has selected this top. Analyze its style, color, and fit. Suggest what kind of bottoms, shoes, and accessories would complete the look. Format your response into readable HTML (using <b>, <ul>, <li>, <p>) without outer body tags.";
         const topResponse = await fetch(args.topUrl);
-        parts.push({ inlineData: { mimeType: topResponse.headers.get("content-type") || "image/jpeg", data: Buffer.from(await topResponse.arrayBuffer()).toString('base64') }});
+        parts.push({ inlineData: { mimeType: topResponse.headers.get("content-type") || "image/jpeg", data: await bufferToBase64(topResponse) }});
       } else if (args.bottomUrl) {
         prompt = "You are a professional fashion stylist. The user has selected this bottom. Analyze its style and color. Suggest what kind of tops, shoes, and accessories would complete the look. Format your response into readable HTML (using <b>, <ul>, <li>, <p>) without outer body tags.";
         const bottomResponse = await fetch(args.bottomUrl);
-        parts.push({ inlineData: { mimeType: bottomResponse.headers.get("content-type") || "image/jpeg", data: Buffer.from(await bottomResponse.arrayBuffer()).toString('base64') }});
+        parts.push({ inlineData: { mimeType: bottomResponse.headers.get("content-type") || "image/jpeg", data: await bufferToBase64(bottomResponse) }});
       }
 
       parts.unshift({ text: prompt });
