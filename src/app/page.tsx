@@ -284,12 +284,20 @@ export default function ApnaLookApp() {
       (selection.bottomSize === "" || c.sizes.includes(selection.bottomSize) || (selection.bottomSize === 'Custom' && customPantSize && c.sizes.includes(customPantSize)))
     );
 
-    const combinations: { top: ClothItem; bottom: ClothItem }[] = [];
-    tops.forEach(top => {
-      bottoms.forEach(bottom => {
-        combinations.push({ top, bottom });
+    const combinations: { top: ClothItem | null; bottom: ClothItem | null }[] = [];
+    
+    if (tops.length > 0 && bottoms.length > 0) {
+      tops.forEach(top => {
+        bottoms.forEach(bottom => {
+          combinations.push({ top, bottom });
+        });
       });
-    });
+    } else if (tops.length > 0) {
+      tops.forEach(top => combinations.push({ top, bottom: null }));
+    } else if (bottoms.length > 0) {
+      bottoms.forEach(bottom => combinations.push({ top: null, bottom }));
+    }
+    
     return combinations;
   }, [retailerData.clothes, selection, customTopSize, customPantSize]);
 
@@ -1052,15 +1060,15 @@ function OutfitSuggestions({ combinations, currentIndex, setCurrentIndex, showVi
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   const handleVirtualTryOn = async () => {
-    if (!current?.top?.image || !current?.bottom?.image) return;
+    if (!current?.top?.image && !current?.bottom?.image) return;
     
     setShowVirtualTryOn(true);
     setIsAnalyzing(true);
     setAnalysisResult(null);
     try {
       const result = await analyzeOutfit({
-        topUrl: current.top.image,
-        bottomUrl: current.bottom.image
+        topUrl: current.top?.image || undefined,
+        bottomUrl: current.bottom?.image || undefined
       });
       setAnalysisResult(result);
     } catch (err: any) {
@@ -1078,7 +1086,10 @@ function OutfitSuggestions({ combinations, currentIndex, setCurrentIndex, showVi
   return (
     <div className="min-h-screen w-full bg-rose-50 p-6 flex flex-col items-center">
       <div className="flex items-center w-full gap-4 mb-8"><button onClick={onBack} className="p-3 bg-white rounded-2xl shadow-sm"><ChevronLeft /></button><h1 className="text-xl font-bold uppercase">Suggestions</h1></div>
-      <div className="flex items-center gap-4 w-full max-w-md"><button onClick={() => setCurrentIndex((currentIndex - 1 + combinations.length) % combinations.length)}><ChevronLeft /></button><div className="flex-1 space-y-4 bg-white p-4 rounded-3xl"><img src={current.top.image} className="w-full rounded-2xl" /><img src={current.bottom.image} className="w-full rounded-2xl" /></div><button onClick={() => setCurrentIndex((currentIndex + 1) % combinations.length)}><ChevronRight /></button></div>
+      <div className="flex items-center gap-4 w-full max-w-md"><button onClick={() => setCurrentIndex((currentIndex - 1 + combinations.length) % combinations.length)}><ChevronLeft /></button><div className="flex-1 space-y-4 bg-white p-4 rounded-3xl">
+        {current.top ? <img src={current.top.image} className="w-full rounded-2xl" /> : <div className="w-full h-40 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-400 font-bold uppercase text-[10px]">No Top Selected</div>}
+        {current.bottom ? <img src={current.bottom.image} className="w-full rounded-2xl" /> : <div className="w-full h-40 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-400 font-bold uppercase text-[10px]">No Bottom Selected</div>}
+      </div><button onClick={() => setCurrentIndex((currentIndex + 1) % combinations.length)}><ChevronRight /></button></div>
       <button onClick={handleVirtualTryOn} className="mt-8 py-4 px-8 bg-emerald-500 text-white font-bold rounded-2xl uppercase tracking-widest">Virtual Try-On</button>
       
       <AnimatePresence>

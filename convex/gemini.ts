@@ -3,8 +3,8 @@ import { v } from "convex/values";
 
 export const analyzeOutfit = action({
   args: {
-    topUrl: v.string(),
-    bottomUrl: v.string(),
+    topUrl: v.optional(v.string()),
+    bottomUrl: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     try {
@@ -13,41 +13,37 @@ export const analyzeOutfit = action({
         throw new Error("GEMINI_API_KEY environment variable is not set.");
       }
 
-      // Fetch images and convert to base64
-      const topResponse = await fetch(args.topUrl);
-      const topBuffer = await topResponse.arrayBuffer();
-      const topBase64 = Buffer.from(topBuffer).toString('base64');
-      const topMimeType = topResponse.headers.get("content-type") || "image/jpeg";
+      if (!args.topUrl && !args.bottomUrl) {
+          throw new Error("No clothing items provided to analyze.");
+      }
 
-      const bottomResponse = await fetch(args.bottomUrl);
-      const bottomBuffer = await bottomResponse.arrayBuffer();
-      const bottomBase64 = Buffer.from(bottomBuffer).toString('base64');
-      const bottomMimeType = bottomResponse.headers.get("content-type") || "image/jpeg";
+      const parts: any[] = [];
+      let prompt = "";
 
-      // Call Gemini API REST Endpoint
-      // We will use gemini-1.5-pro as it handles multi-image well.
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro-latest:generateContent?key=${apiKey}`;
+      if (args.topUrl && args.bottomUrl) {
+        prompt = "You are a professional fashion stylist. The user has selected these two items for an outfit. Analyze how well they go together. Respond in a friendly tone. Mention color matching, style, and suggestions for shoes/accessories. Format your response into readable HTML (using <b>, <ul>, <li>, <p>) without outer body tags.";
+        
+        const topResponse = await fetch(args.topUrl);
+        parts.push({ inlineData: { mimeType: topResponse.headers.get("content-type") || "image/jpeg", data: Buffer.from(await topResponse.arrayBuffer()).toString('base64') }});
+        
+        const bottomResponse = await fetch(args.bottomUrl);
+        parts.push({ inlineData: { mimeType: bottomResponse.headers.get("content-type") || "image/jpeg", data: Buffer.from(await bottomResponse.arrayBuffer()).toString('base64') }});
+      } else if (args.topUrl) {
+        prompt = "You are a professional fashion stylist. The user has selected this top. Analyze its style, color, and fit. Suggest what kind of bottoms, shoes, and accessories would complete the look. Format your response into readable HTML (using <b>, <ul>, <li>, <p>) without outer body tags.";
+        const topResponse = await fetch(args.topUrl);
+        parts.push({ inlineData: { mimeType: topResponse.headers.get("content-type") || "image/jpeg", data: Buffer.from(await topResponse.arrayBuffer()).toString('base64') }});
+      } else if (args.bottomUrl) {
+        prompt = "You are a professional fashion stylist. The user has selected this bottom. Analyze its style and color. Suggest what kind of tops, shoes, and accessories would complete the look. Format your response into readable HTML (using <b>, <ul>, <li>, <p>) without outer body tags.";
+        const bottomResponse = await fetch(args.bottomUrl);
+        parts.push({ inlineData: { mimeType: bottomResponse.headers.get("content-type") || "image/jpeg", data: Buffer.from(await bottomResponse.arrayBuffer()).toString('base64') }});
+      }
 
-      const prompt = "You are a professional fashion stylist and image consultant. The user has selected these two clothing items for a virtual outfit: a top and a bottom. As an expert, analyze how well they go together. Respond in a friendly, enthusiastic tone. Mention color matching, style compatibility (e.g., casual, formal), body proportions, and suggestions on what kind of shoes or accessories would complete the look. Format your response into a readable HTML format (using <b>, <ul>, <li>, <p> etc.) but do not include the outer HTML or body tags - just the inner content.";
+      parts.unshift({ text: prompt });
 
       const payload = {
         contents: [
           {
-            parts: [
-              { text: prompt },
-              {
-                inlineData: {
-                  mimeType: topMimeType,
-                  data: topBase64
-                }
-              },
-              {
-                inlineData: {
-                  mimeType: bottomMimeType,
-                  data: bottomBase64
-                }
-              }
-            ]
+            parts: parts
           }
         ],
         generationConfig: {
@@ -55,6 +51,8 @@ export const analyzeOutfit = action({
             maxOutputTokens: 800,
         }
       };
+
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro-latest:generateContent?key=${apiKey}`;
 
       const response = await fetch(url, {
         method: "POST",
