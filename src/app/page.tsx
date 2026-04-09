@@ -816,6 +816,9 @@ function RetailerUpload({ retailerData, topUpload, setTopUpload, bottomUpload, s
   };
   const isComplete = (upload: UploadState) => upload.type && upload.sizes.length > 0 && upload.image;
 
+  const savedTops = retailerData.clothes.filter((c: ClothItem) => c.category === "top");
+  const savedBottoms = retailerData.clothes.filter((c: ClothItem) => c.category === "bottom");
+
   return (
     <div className="min-h-screen w-full flex flex-col p-6 bg-slate-900 overflow-y-auto">
       <div className="flex items-center justify-between mb-8 max-w-2xl mx-auto w-full">
@@ -823,20 +826,76 @@ function RetailerUpload({ retailerData, topUpload, setTopUpload, bottomUpload, s
         <button onClick={onLogout} className="p-2 text-slate-400 hover:text-white"><LogOut /></button>
       </div>
       <div className="max-w-2xl mx-auto w-full space-y-8 pb-32">
-        {["top", "bottom"].map((cat: any) => {
+        {(["top", "bottom"] as const).map((cat) => {
           const state = cat === "top" ? topUpload : bottomUpload;
           const setter = cat === "top" ? setTopUpload : setBottomUpload;
           const ref = cat === "top" ? topFileInputRef : bottomFileInputRef;
+          const savedItems = cat === "top" ? savedTops : savedBottoms;
           return (
             <div key={cat} className="bg-slate-800 rounded-3xl p-6 relative">
-              {saveSuccess === cat && <div className="absolute inset-x-0 top-0 bg-emerald-500 py-1 text-center text-white text-[10px] font-bold">SAVED</div>}
-              <h2 className="text-lg font-bold text-emerald-400 mb-6 uppercase">{cat} Wear</h2>
-              <div className="space-y-6">
-                <div className="flex flex-wrap gap-2">{(cat === "top" ? topTypes : bottomTypes).map(t => <button key={t} onClick={() => setter((p: any) => ({ ...p, type: t }))} className={`py-2 px-3 rounded-xl text-[10px] font-bold ${state.type === t ? "bg-emerald-500 text-white" : "bg-slate-700 text-slate-400"}`}>{t}</button>)}</div>
-                <div className="flex flex-wrap gap-2">{(cat === "top" ? topSizes : bottomSizes).map(s => <button key={s} onClick={() => toggleSize(s, cat)} className={`w-10 h-10 rounded-xl text-[10px] font-bold ${state.sizes.includes(s) ? "bg-emerald-500 text-white" : "bg-slate-700 text-slate-400"}`}>{s}</button>)}</div>
-                <div onClick={() => ref.current?.click()} className="border-2 border-dashed border-slate-700 rounded-2xl p-6 text-center cursor-pointer">{state.image ? <img src={state.image} className="w-24 h-24 object-cover mx-auto" /> : <Upload className="mx-auto text-slate-600" />}</div>
+              {saveSuccess === cat && <div className="absolute inset-x-0 top-0 bg-emerald-500 py-2 text-center text-white text-[10px] font-bold rounded-t-3xl">✓ SAVED SUCCESSFULLY</div>}
+              <h2 className="text-lg font-bold text-emerald-400 mb-4 uppercase">{cat} Wear</h2>
+
+              {/* Saved Items List — persists across type selections */}
+              {savedItems.length > 0 && (
+                <div className="mb-6">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">
+                    Added {cat === "top" ? "Tops" : "Bottoms"} ({savedItems.length})
+                  </p>
+                  <div className="flex flex-wrap gap-3">
+                    {savedItems.map((item: ClothItem) => (
+                      <div key={item.id} className="flex items-center gap-2 bg-slate-700 rounded-2xl px-3 py-2">
+                        <img src={item.image} alt={item.type} className="w-8 h-8 rounded-lg object-cover" />
+                        <div>
+                          <p className="text-white text-[10px] font-bold">{item.type}</p>
+                          <p className="text-slate-400 text-[9px]">{item.sizes.join(", ")}</p>
+                        </div>
+                        <div className="ml-1 w-2 h-2 rounded-full bg-emerald-400" />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-3 border-t border-slate-700" />
+                </div>
+              )}
+
+              {/* Add New Item Form */}
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Add New {cat} Item</p>
+              <div className="space-y-4">
+                <div className="flex flex-wrap gap-2">
+                  {(cat === "top" ? topTypes : bottomTypes).map(t => (
+                    <button
+                      key={t}
+                      onClick={() => setter((p: any) => ({ ...p, type: t }))}
+                      className={`py-2 px-3 rounded-xl text-[10px] font-bold transition-colors ${state.type === t ? "bg-emerald-500 text-white" : "bg-slate-700 text-slate-400 hover:bg-slate-600"}`}
+                    >{t}</button>
+                  ))}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {(cat === "top" ? topSizes : bottomSizes).map(s => (
+                    <button
+                      key={s}
+                      onClick={() => toggleSize(s, cat)}
+                      className={`w-10 h-10 rounded-xl text-[10px] font-bold transition-colors ${state.sizes.includes(s) ? "bg-emerald-500 text-white" : "bg-slate-700 text-slate-400 hover:bg-slate-600"}`}
+                    >{s}</button>
+                  ))}
+                </div>
+                <div
+                  onClick={() => ref.current?.click()}
+                  className="border-2 border-dashed border-slate-700 rounded-2xl p-6 text-center cursor-pointer hover:border-emerald-500 transition-colors"
+                >
+                  {state.image
+                    ? <img src={state.image} className="w-24 h-24 object-cover mx-auto rounded-xl" />
+                    : <div className="flex flex-col items-center gap-2"><Upload className="text-slate-600" /><p className="text-[10px] text-slate-500">Tap to upload image</p></div>
+                  }
+                </div>
                 <input ref={ref} type="file" accept="image/*" onChange={(e) => onFileUpload(e, cat)} className="hidden" />
-                <button onClick={() => onSave(cat)} disabled={!isComplete(state)} className="w-full py-3 rounded-2xl bg-emerald-500 text-white font-bold disabled:opacity-20">Save</button>
+                <button
+                  onClick={() => onSave(cat)}
+                  disabled={!isComplete(state)}
+                  className="w-full py-3 rounded-2xl bg-emerald-500 text-white font-bold disabled:opacity-20 transition-opacity"
+                >
+                  {isComplete(state) ? `Save ${state.type || cat}` : "Select type, sizes & image"}
+                </button>
               </div>
             </div>
           );
