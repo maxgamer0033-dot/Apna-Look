@@ -40,5 +40,18 @@ yarn-error.log*
 next-env.d.ts
 
 .env.local
+.vercel
+
+# Convex auto-generated files — these get regenerated on every `npx convex dev`
+# They are tracked by Convex CLI so keep them committed, 
+# but this is why you see frequent uncommitted changes.
+# To avoid this, always run `npx convex dev` BEFORE committing.
+
+# Temp helper scripts created during git operations
+_gc.py
+_gc2.py
+_commit.bat
+_finish.bat
+_last.bat
 
 .vercel
