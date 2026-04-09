@@ -31,7 +31,7 @@ import {
   Phone,
   Loader2,
 } from "lucide-react";
-import { useMutation, useQuery } from "convex/react";
+import { useMutation, useQuery, useAction } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
 
@@ -940,22 +940,91 @@ function ScanQRPage({ isScanning, onStartScanning, onScan, onBack }: any) {
   useEffect(() => {
     let q: any = null;
     let mounted = true;
+    
     if (isScanning) { 
-      import("html5-qrcode").then(({ Html5Qrcode }) => {
+      import("html5-qrcode").then(({ Html5QrcodeScanner }) => {
         if (!mounted) return;
-        q = new Html5Qrcode("reader"); 
-        q.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, (t: string) => { onScan(t); q.stop(); }); 
+        
+        q = new Html5QrcodeScanner(
+          "reader", 
+          { 
+            fps: 10, 
+            qrbox: { width: 250, height: 250 },
+            aspectRatio: 1.0,
+          }, 
+          /* verbose= */ false
+        );
+        
+        q.render(
+          (t: string) => { 
+            if (mounted) {
+              onScan(t); 
+              q.clear().catch(console.error);
+            }
+          },
+          () => {} // Ignore continuous scan frame errors
+        );
       }).catch(console.error);
     }
+    
     return () => {
       mounted = false;
-      try { if (q) q.stop(); } catch {}
+      if (q) {
+        q.clear().catch(console.error);
+      }
     };
   }, [isScanning, onScan]);
+
   return (
     <div className="min-h-screen w-full bg-slate-900 flex flex-col">
-      <div className="p-8"><button onClick={onBack} className="p-3 bg-white/10 text-white rounded-2xl"><ChevronLeft /></button></div>
-      <div className="flex-1 flex flex-col items-center justify-center p-8"><div className="w-72 h-72 border-2 border-white/20 rounded-3xl overflow-hidden mb-12"><div id="reader" className="w-full h-full" /></div><button onClick={onStartScanning} className="w-full max-w-xs py-4 bg-rose-500 text-white font-bold rounded-2xl uppercase">{isScanning ? "Wait..." : "Open Camera"}</button></div>
+      <div className="p-8">
+        <button onClick={onBack} className="p-3 bg-white/10 text-white rounded-2xl">
+          <ChevronLeft />
+        </button>
+      </div>
+      <div className="flex-1 flex flex-col items-center justify-center p-8">
+        <div className="w-full max-w-[320px] bg-white rounded-3xl overflow-hidden mb-12 relative p-4 shadow-2xl">
+          <div id="reader" className="w-full text-slate-800" />
+          {!isScanning && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-100 text-slate-400">
+               <QrCode className="w-16 h-16 mb-2 opacity-50" />
+               <span className="text-xs font-bold uppercase">Camera Off</span>
+            </div>
+          )}
+        </div>
+        {!isScanning && (
+          <button 
+            onClick={onStartScanning} 
+            className="w-full max-w-xs py-4 bg-rose-500 text-white font-bold rounded-2xl uppercase transition duration-300 hover:bg-rose-600"
+          >
+            Start Scanner
+          </button>
+        )}
+      </div>
+      
+      {/* Required CSS to make Html5QrcodeScanner look good within the card */}
+      <style dangerouslySetInnerHTML={{__html: `
+        #reader { border: none !important; }
+        #reader button { 
+          background-color: #f43f5e !important; 
+          color: white !important; 
+          border: none !important; 
+          padding: 10px 16px !important; 
+          border-radius: 12px !important;
+          font-weight: bold !important;
+          margin-top: 10px !important;
+          margin-bottom: 10px !important;
+        }
+        #reader select {
+          padding: 8px !important;
+          border-radius: 8px !important;
+          border: 1px solid #e2e8f0 !important;
+          margin-bottom: 10px !important;
+          width: 100% !important;
+        }
+        #reader img { display: none !important; } 
+        #reader a { display: none !important; }
+      `}} />
     </div>
   );
 }
@@ -976,13 +1045,64 @@ function OutfitSelection({ selection, setSelection, onContinue, onBack }: any) {
 
 function OutfitSuggestions({ combinations, currentIndex, setCurrentIndex, showVirtualTryOn, setShowVirtualTryOn, onBack }: any) {
   const current = combinations[currentIndex];
+  
+  // Call Convex gemini action
+  const analyzeOutfit = useAction((api as any).gemini?.analyzeOutfit || "gemini:analyzeOutfit");
+  const [analysisResult, setAnalysisResult] = useState<string | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+  const handleVirtualTryOn = async () => {
+    if (!current?.top?.image || !current?.bottom?.image) return;
+    
+    setShowVirtualTryOn(true);
+    setIsAnalyzing(true);
+    setAnalysisResult(null);
+    try {
+      const result = await analyzeOutfit({
+        topUrl: current.top.image,
+        bottomUrl: current.bottom.image
+      });
+      setAnalysisResult(result);
+    } catch (err: any) {
+      console.error(err);
+      setAnalysisResult("Cannot analyze outfit right now. Please ensure GEMINI_API_KEY is configured in the Convex dashboard.");
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
   if (!current) return <div className="min-h-screen w-full bg-rose-50 flex items-center justify-center"><button onClick={onBack} className="font-bold text-rose-500 uppercase">No outfits. Back</button></div>;
+  
   return (
     <div className="min-h-screen w-full bg-rose-50 p-6 flex flex-col items-center">
       <div className="flex items-center w-full gap-4 mb-8"><button onClick={onBack} className="p-3 bg-white rounded-2xl shadow-sm"><ChevronLeft /></button><h1 className="text-xl font-bold uppercase">Suggestions</h1></div>
       <div className="flex items-center gap-4 w-full max-w-md"><button onClick={() => setCurrentIndex((currentIndex - 1 + combinations.length) % combinations.length)}><ChevronLeft /></button><div className="flex-1 space-y-4 bg-white p-4 rounded-3xl"><img src={current.top.image} className="w-full rounded-2xl" /><img src={current.bottom.image} className="w-full rounded-2xl" /></div><button onClick={() => setCurrentIndex((currentIndex + 1) % combinations.length)}><ChevronRight /></button></div>
-      <button onClick={() => setShowVirtualTryOn(true)} className="mt-8 py-4 px-8 bg-emerald-500 text-white font-bold rounded-2xl uppercase tracking-widest">Virtual Try-On</button>
-      <AnimatePresence>{showVirtualTryOn && (<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowVirtualTryOn(false)} className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-6"><div className="bg-white p-8 rounded-3xl text-center"><h2 className="text-xl font-bold mb-4 uppercase">Coming Soon</h2><button className="w-full py-4 bg-slate-900 text-white font-bold rounded-xl">Back</button></div></motion.div>)}</AnimatePresence>
+      <button onClick={handleVirtualTryOn} className="mt-8 py-4 px-8 bg-emerald-500 text-white font-bold rounded-2xl uppercase tracking-widest">Virtual Try-On</button>
+      
+      <AnimatePresence>
+        {showVirtualTryOn && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-6">
+            <div className="bg-white p-8 rounded-3xl w-full max-w-lg max-h-[80vh] flex flex-col items-center shadow-2xl">
+              <h2 className="text-xl font-bold mb-4 uppercase text-emerald-500 flex items-center gap-2">
+                <Sparkles className="w-5 h-5" /> AI Stylist Analysis
+              </h2>
+              
+              <div className="w-full flex-1 overflow-y-auto min-h-[250px] mb-6 p-5 bg-slate-50 rounded-2xl border border-slate-100 text-slate-700 text-sm leading-relaxed text-left">
+                {isAnalyzing ? (
+                  <div className="flex flex-col items-center justify-center h-full text-slate-400 py-10">
+                    <Loader2 className="w-8 h-8 animate-spin mb-4 text-emerald-500" />
+                    <p className="font-bold uppercase tracking-widest text-[10px]">Gemini is assessing your outfit...</p>
+                  </div>
+                ) : (
+                  <div dangerouslySetInnerHTML={{ __html: analysisResult || "" }} className="prose prose-sm prose-emerald" />
+                )}
+              </div>
+              
+              <button onClick={() => setShowVirtualTryOn(false)} className="w-full py-4 bg-slate-900 text-white font-bold rounded-xl uppercase tracking-widest text-xs">Close</button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
