@@ -150,7 +150,12 @@ export default function ApnaLookApp() {
     mobile: "",
   });
   
-  const [scannedRetailerId, setScannedRetailerId] = useState<string | null>(null);
+  const [scannedRetailerId, setScannedRetailerId] = useState<string | null>(() => {
+    if (isBrowser()) {
+      try { return window.localStorage.getItem("apnalook_scannedRetailerId"); } catch {}
+    }
+    return null;
+  });
   const [saveSuccess, setSaveSuccess] = useState<"top" | "bottom" | null>(null);
 
   const [topUpload, setTopUpload] = useState<UploadState>({ type: "", sizes: [], image: null, file: null });
@@ -622,6 +627,7 @@ export default function ApnaLookApp() {
             showVirtualTryOn={showVirtualTryOn}
             setShowVirtualTryOn={setShowVirtualTryOn}
             onBack={() => navigateTo("outfit-selection")}
+            isLoading={scannedRetailerId ? scannedClothes === undefined : false}
           />
         )}
 
@@ -1051,7 +1057,16 @@ function OutfitSelection({ selection, setSelection, onContinue, onBack }: any) {
   );
 }
 
-function OutfitSuggestions({ combinations, currentIndex, setCurrentIndex, showVirtualTryOn, setShowVirtualTryOn, onBack }: any) {
+function OutfitSuggestions({ combinations, currentIndex, setCurrentIndex, showVirtualTryOn, setShowVirtualTryOn, onBack, isLoading }: any) {
+  if (isLoading) {
+    return (
+      <div className="min-h-screen w-full bg-rose-50 flex flex-col items-center justify-center">
+        <Loader2 className="w-10 h-10 animate-spin text-rose-500 mb-4" />
+        <p className="font-bold uppercase tracking-widest text-slate-500 text-xs">Loading Outfits...</p>
+      </div>
+    );
+  }
+
   const current = combinations[currentIndex];
   
   // Call Convex gemini action — api.gemini is confirmed in generated types
@@ -1081,7 +1096,13 @@ function OutfitSuggestions({ combinations, currentIndex, setCurrentIndex, showVi
     }
   };
 
-  if (!current) return <div className="min-h-screen w-full bg-rose-50 flex items-center justify-center"><button onClick={onBack} className="font-bold text-rose-500 uppercase">No outfits. Back</button></div>;
+  if (!current) {
+    return (
+      <div className="min-h-screen w-full bg-rose-50 flex items-center justify-center">
+        <button onClick={onBack} className="font-bold text-rose-500 uppercase">No outfits. Back</button>
+      </div>
+    );
+  }
   
   return (
     <div className="min-h-screen w-full bg-rose-50 p-6 flex flex-col items-center">
