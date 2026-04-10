@@ -4,9 +4,10 @@
     "private": true,
     "scripts": {
         "dev": "next dev --turbopack",
-        "build": "next build",
+        "build": "npx convex deploy --cmd \"next build\"",
         "start": "next start",
-        "lint": "next lint"
+        "lint": "next lint",
+        "ship": "git add . && git commit -m \"Auto-update\" && git push"
     },
     "dependencies": {
         "@babel/parser": "^7.28.5",
