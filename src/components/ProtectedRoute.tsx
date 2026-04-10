@@ -30,9 +30,9 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
   // Show spinner while auth resolves
   if (isLoading) {
     return (
-      <div className="min-h-screen w-full flex flex-col items-center justify-center bg-slate-900">
-        <Loader2 className="w-12 h-12 text-rose-500 animate-spin mb-4" />
-        <p className="text-slate-400 text-sm font-semibold tracking-widest uppercase">
+      <div className="min-h-[100dvh] w-full flex flex-col items-center justify-center bg-slate-900 safe-bottom">
+        <Loader2 className="w-10 h-10 sm:w-12 sm:h-12 text-rose-500 animate-spin mb-4" />
+        <p className="text-slate-400 text-xs sm:text-sm font-semibold tracking-widest uppercase">
           Loading ApnaLook...
         </p>
       </div>

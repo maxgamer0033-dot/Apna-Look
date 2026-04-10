@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
-import { LogOut, Upload, ArrowLeft } from "lucide-react";
+import { Upload, ArrowLeft, Check } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -15,14 +15,12 @@ export default function InventoryPage() {
   const router = useRouter();
   
   if (role !== "retailer") {
-    // Basic protection if a customer tries to access
     router.push("/dashboard");
     return null;
   }
 
   const [qrStep, setQrStep] = useState<"none" | "preview" | "download">("none");
 
-  // Reactively fetch clothes
   const clothesDocs = useQuery(api.clothes.getByRetailer, user?._id ? { retailerId: user._id as Id<"retailers"> } : "skip");
   
   const clothes: ClothItem[] = (clothesDocs || []).map(c => ({
@@ -116,16 +114,22 @@ function RetailerUpload({ retailer, clothes, onGenerateQR, onBack }: any) {
   const savedBottoms = clothes.filter((c: ClothItem) => c.category === "bottom");
 
   return (
-    <div className="min-h-screen w-full flex flex-col p-6 bg-slate-900 overflow-y-auto">
-      <div className="flex items-center justify-between mb-8 max-w-2xl mx-auto w-full">
-        <div className="flex items-center gap-3">
-          <button onClick={onBack} className="p-2 bg-slate-800 rounded-xl text-white hover:bg-slate-700 transition">
+    <div className="min-h-[100dvh] w-full flex flex-col bg-slate-900 overflow-y-auto">
+      {/* Header */}
+      <div className="sticky top-0 z-10 bg-slate-900/95 backdrop-blur-md border-b border-slate-800/50 px-4 sm:px-6 py-3 safe-top">
+        <div className="flex items-center gap-3 max-w-2xl mx-auto">
+          <button onClick={onBack} className="p-2.5 bg-slate-800 rounded-xl text-white hover:bg-slate-700 active:scale-95 transition">
              <ArrowLeft className="w-5 h-5" />
           </button>
-          <h1 className="text-2xl font-bold text-white">Inventory</h1>
+          <div>
+            <h1 className="text-lg sm:text-xl font-bold text-white">Inventory</h1>
+            <p className="text-[11px] text-slate-400">{clothes.length} items added</p>
+          </div>
         </div>
       </div>
-      <div className="max-w-2xl mx-auto w-full space-y-8 pb-32">
+
+      {/* Content */}
+      <div className="max-w-2xl mx-auto w-full space-y-6 px-4 sm:px-6 py-5 pb-28 safe-bottom">
         {(["top", "bottom"] as const).map((cat) => {
           const state = cat === "top" ? topUpload : bottomUpload;
           const setter = cat === "top" ? setTopUpload : setBottomUpload;
@@ -133,66 +137,85 @@ function RetailerUpload({ retailer, clothes, onGenerateQR, onBack }: any) {
           const savedItems = cat === "top" ? savedTops : savedBottoms;
           
           return (
-            <div key={cat} className="bg-slate-800 rounded-3xl p-6 relative">
-              {saveSuccess === cat && <div className="absolute inset-x-0 top-0 bg-emerald-500 py-2 text-center text-white text-[10px] font-bold rounded-t-3xl">✓ SAVED SUCCESSFULLY</div>}
-              <h2 className="text-lg font-bold text-emerald-400 mb-4 uppercase">{cat} Wear</h2>
-
-              {savedItems.length > 0 && (
-                <div className="mb-6">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">
-                    Added {cat === "top" ? "Tops" : "Bottoms"} ({savedItems.length})
-                  </p>
-                  <div className="flex flex-wrap gap-3">
-                    {savedItems.map((item: ClothItem) => (
-                      <div key={item.id} className="flex items-center gap-2 bg-slate-700 rounded-2xl px-3 py-2">
-                        <img src={item.image} alt={item.type} className="w-8 h-8 rounded-lg object-cover" />
-                        <div>
-                          <p className="text-white text-[10px] font-bold">{item.type}</p>
-                          <p className="text-slate-400 text-[9px]">{item.sizes.join(", ")}</p>
-                        </div>
-                        <div className="ml-1 w-2 h-2 rounded-full bg-emerald-400" />
-                      </div>
-                    ))}
-                  </div>
-                  <div className="mt-3 border-t border-slate-700" />
+            <div key={cat} className="bg-slate-800 rounded-2xl sm:rounded-3xl p-4 sm:p-6 relative overflow-hidden">
+              {/* Success banner */}
+              {saveSuccess === cat && (
+                <div className="absolute inset-x-0 top-0 bg-emerald-500 py-2 px-4 text-center text-white text-xs font-bold flex items-center justify-center gap-1.5 z-10">
+                  <Check className="w-3.5 h-3.5" /> Saved Successfully
                 </div>
               )}
 
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Add New {cat} Item</p>
-              <div className="space-y-4">
-                <div className="flex flex-wrap gap-2">
+              <h2 className="text-base sm:text-lg font-bold text-emerald-400 mb-4 uppercase tracking-wide">{cat} Wear</h2>
+
+              {/* Saved items */}
+              {savedItems.length > 0 && (
+                <div className="mb-5">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2.5">
+                    Added {cat === "top" ? "Tops" : "Bottoms"} ({savedItems.length})
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {savedItems.map((item: ClothItem) => (
+                      <div key={item.id} className="flex items-center gap-2 bg-slate-700/70 rounded-xl px-2.5 py-1.5">
+                        <img src={item.image} alt={item.type} className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg object-cover" />
+                        <div>
+                          <p className="text-white text-[10px] font-bold leading-tight">{item.type}</p>
+                          <p className="text-slate-400 text-[9px]">{item.sizes.join(", ")}</p>
+                        </div>
+                        <div className="ml-0.5 w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-3 border-t border-slate-700/50" />
+                </div>
+              )}
+
+              {/* Add new item */}
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2.5">Add New {cat} Item</p>
+              <div className="space-y-3">
+                {/* Type selection */}
+                <div className="flex flex-wrap gap-1.5 sm:gap-2">
                   {(cat === "top" ? topTypes : bottomTypes).map(t => (
                     <button
                       key={t}
                       onClick={() => setter((p: any) => ({ ...p, type: t }))}
-                      className={`py-2 px-3 rounded-xl text-[10px] font-bold transition-colors ${state.type === t ? "bg-emerald-500 text-white" : "bg-slate-700 text-slate-400 hover:bg-slate-600"}`}
+                      className={`py-2 px-2.5 sm:px-3 rounded-xl text-[10px] sm:text-[11px] font-bold transition-colors active:scale-95 ${state.type === t ? "bg-emerald-500 text-white" : "bg-slate-700 text-slate-400 hover:bg-slate-600"}`}
                     >{t}</button>
                   ))}
                 </div>
-                <div className="flex flex-wrap gap-2">
+
+                {/* Size selection */}
+                <div className="flex flex-wrap gap-1.5 sm:gap-2">
                   {(cat === "top" ? topSizes : bottomSizes).map(s => (
                     <button
                       key={s}
                       onClick={() => toggleSize(s, cat)}
-                      className={`w-10 h-10 rounded-xl text-[10px] font-bold transition-colors ${state.sizes.includes(s) ? "bg-emerald-500 text-white" : "bg-slate-700 text-slate-400 hover:bg-slate-600"}`}
+                      className={`w-10 h-10 rounded-xl text-[11px] font-bold transition-colors active:scale-95 ${state.sizes.includes(s) ? "bg-emerald-500 text-white" : "bg-slate-700 text-slate-400 hover:bg-slate-600"}`}
                     >{s}</button>
                   ))}
                 </div>
-                <div onClick={() => ref.current?.click()} className="border-2 border-dashed border-slate-700 rounded-2xl p-6 text-center cursor-pointer hover:border-emerald-500 transition-colors">
+
+                {/* Image upload */}
+                <div onClick={() => ref.current?.click()} className="border-2 border-dashed border-slate-700 rounded-2xl p-5 sm:p-6 text-center cursor-pointer hover:border-emerald-500 active:border-emerald-400 transition-colors">
                   {state.image
-                    ? <img src={state.image} className="w-24 h-24 object-cover mx-auto rounded-xl" />
-                    : <div className="flex flex-col items-center gap-2"><Upload className="text-slate-600" /><p className="text-[10px] text-slate-500">Tap to upload image</p></div>
+                    ? <img src={state.image} className="w-20 h-20 sm:w-24 sm:h-24 object-cover mx-auto rounded-xl" />
+                    : <div className="flex flex-col items-center gap-2"><Upload className="w-6 h-6 text-slate-600" /><p className="text-[11px] text-slate-500">Tap to upload image</p></div>
                   }
                 </div>
                 <input ref={ref} type="file" accept="image/*" onChange={(e) => handleFileUpload(e, cat)} className="hidden" />
-                <button onClick={() => handleSaveItem(cat)} disabled={!isComplete(state)} className="w-full py-3 rounded-2xl bg-emerald-500 text-white font-bold disabled:opacity-20 transition-opacity">
+                
+                {/* Save button */}
+                <button onClick={() => handleSaveItem(cat)} disabled={!isComplete(state)} className="w-full py-3.5 rounded-2xl bg-emerald-500 text-white font-bold disabled:opacity-20 active:scale-[0.98] transition-all text-sm">
                   {isComplete(state) ? `Save ${state.type || cat}` : "Select type, sizes & image"}
                 </button>
               </div>
             </div>
           );
         })}
-        <button onClick={onGenerateQR} disabled={clothes.length === 0} className="w-full py-4 rounded-2xl bg-emerald-500 text-white font-bold disabled:opacity-20 hover:bg-emerald-600 transition-colors">Generate QR</button>
+
+        {/* QR Button */}
+        <button onClick={onGenerateQR} disabled={clothes.length === 0} className="w-full py-4 rounded-2xl bg-emerald-500 text-white font-bold disabled:opacity-20 hover:bg-emerald-600 active:scale-[0.98] transition-all text-base">
+          Generate QR Code
+        </button>
       </div>
     </div>
   );
@@ -202,13 +225,15 @@ function RetailerUpload({ retailer, clothes, onGenerateQR, onBack }: any) {
 
 function RetailerQRPreview({ retailer, onConfirm, onBack }: any) {
   return (
-    <div className="min-h-screen w-full flex flex-col items-center justify-center p-6 bg-slate-900 text-center">
-      <div className="bg-white p-8 rounded-3xl mb-8">
-        <QRCodeSVG value={`${SITE_URL}/store/${retailer._id}`} size={200} />
-        <p className="mt-4 font-bold text-slate-800 uppercase text-xs">{retailer.shopName}</p>
+    <div className="min-h-[100dvh] w-full flex flex-col items-center justify-center px-5 py-8 bg-slate-900 text-center safe-bottom">
+      <div className="bg-white p-6 sm:p-8 rounded-2xl sm:rounded-3xl mb-6 shadow-2xl">
+        <QRCodeSVG value={`${SITE_URL}/store/${retailer._id}`} size={180} />
+        <p className="mt-3 font-bold text-slate-800 uppercase text-[11px] tracking-wider">{retailer.shopName}</p>
       </div>
-      <button onClick={onConfirm} className="w-full max-w-xs py-4 rounded-2xl bg-emerald-500 text-white font-bold mb-4 hover:bg-emerald-600 transition">Confirm</button>
-      <button onClick={onBack} className="text-slate-400 hover:text-white font-bold transition">Back</button>
+      <div className="w-full max-w-xs space-y-3">
+        <button onClick={onConfirm} className="w-full py-4 rounded-2xl bg-emerald-500 text-white font-bold hover:bg-emerald-600 active:scale-[0.98] transition-all text-base">Confirm</button>
+        <button onClick={onBack} className="w-full py-3 text-slate-400 hover:text-white font-bold transition text-sm">← Go Back</button>
+      </div>
     </div>
   );
 }
@@ -237,14 +262,14 @@ function RetailerQRPage({ retailer, onBack }: any) {
   };
 
   return (
-    <div className="min-h-screen w-full flex flex-col items-center justify-center p-6 bg-slate-900 text-center">
-      <div className="bg-white p-8 rounded-3xl mb-8">
-        <QRCodeSVG id="retailer-qr" value={`${SITE_URL}/store/${retailer._id}`} size={240} />
-        <p className="mt-4 font-bold text-slate-800 uppercase text-xs">{retailer.shopName}</p>
+    <div className="min-h-[100dvh] w-full flex flex-col items-center justify-center px-5 py-8 bg-slate-900 text-center safe-bottom">
+      <div className="bg-white p-6 sm:p-8 rounded-2xl sm:rounded-3xl mb-6 shadow-2xl">
+        <QRCodeSVG id="retailer-qr" value={`${SITE_URL}/store/${retailer._id}`} size={200} />
+        <p className="mt-3 font-bold text-slate-800 uppercase text-[11px] tracking-wider">{retailer.shopName}</p>
       </div>
-      <div className="flex gap-4 w-full max-w-xs">
-        <button onClick={handleDownload} className="flex-1 py-4 rounded-2xl bg-slate-800 text-white font-bold hover:bg-slate-700 transition">Download</button>
-        <button onClick={onBack} className="flex-1 py-4 rounded-2xl bg-emerald-500 text-white font-bold hover:bg-emerald-600 transition">Done</button>
+      <div className="flex gap-3 w-full max-w-xs">
+        <button onClick={handleDownload} className="flex-1 py-4 rounded-2xl bg-slate-800 text-white font-bold hover:bg-slate-700 active:scale-[0.98] transition-all text-sm">Download</button>
+        <button onClick={onBack} className="flex-1 py-4 rounded-2xl bg-emerald-500 text-white font-bold hover:bg-emerald-600 active:scale-[0.98] transition-all text-sm">Done</button>
       </div>
     </div>
   );
