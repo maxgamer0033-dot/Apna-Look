@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, QrCode, ChevronRight, Sparkles, Loader2 } from "lucide-react";
+import { ChevronLeft, QrCode, ChevronRight, Sparkles, Loader2, SwitchCamera } from "lucide-react";
 import { useQuery, useAction } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
@@ -118,38 +118,124 @@ export default function ScanPage() {
 
 function ScanQRPage({ onScan, onBack }: any) {
   const [isScanning, setIsScanning] = useState(false);
+  const [useBackCamera, setUseBackCamera] = useState(true); // default to back camera
+  const scannerRef = useRef<any>(null);
 
-  useEffect(() => {
-    let q: any = null;
-    let mounted = true;
-    
-    if (isScanning) { 
-      import("html5-qrcode").then(({ Html5QrcodeScanner }) => {
-        if (!mounted) return;
-        q = new Html5QrcodeScanner("reader", { fps: 10, qrbox: { width: 220, height: 220 }, aspectRatio: 1.0 }, false);
-        q.render((t: string) => { 
-            if (mounted) { onScan(t); q.clear().catch(console.error); setIsScanning(false); }
-        }, () => {});
-      }).catch(console.error);
+  const startScanner = useCallback(async (preferBack: boolean) => {
+    try {
+      const { Html5Qrcode } = await import("html5-qrcode");
+      
+      // Stop any existing scanner first
+      if (scannerRef.current) {
+        try { await scannerRef.current.stop(); } catch {}
+        try { scannerRef.current.clear(); } catch {}
+      }
+
+      const scanner = new Html5Qrcode("reader");
+      scannerRef.current = scanner;
+
+      const facingMode = preferBack ? { facingMode: "environment" } : { facingMode: "user" };
+
+      await scanner.start(
+        facingMode,
+        { fps: 10, qrbox: { width: 220, height: 220 }, aspectRatio: 1.0 },
+        (decodedText: string) => {
+          scanner.stop().then(() => scanner.clear()).catch(console.error);
+          scannerRef.current = null;
+          onScan(decodedText);
+        },
+        () => {} // ignore per-frame errors
+      );
+    } catch (err) {
+      console.error("Camera error:", err);
+      // If back camera fails, try front camera as fallback
+      if (preferBack) {
+        try {
+          const { Html5Qrcode } = await import("html5-qrcode");
+          const scanner = new Html5Qrcode("reader");
+          scannerRef.current = scanner;
+          await scanner.start(
+            { facingMode: "user" },
+            { fps: 10, qrbox: { width: 220, height: 220 }, aspectRatio: 1.0 },
+            (decodedText: string) => {
+              scanner.stop().then(() => scanner.clear()).catch(console.error);
+              scannerRef.current = null;
+              onScan(decodedText);
+            },
+            () => {}
+          );
+          setUseBackCamera(false);
+        } catch (e2) {
+          console.error("Fallback camera also failed:", e2);
+          alert("Could not access camera. Please grant camera permission.");
+          setIsScanning(false);
+        }
+      }
     }
+  }, [onScan]);
+
+  const handleStartScanning = useCallback(() => {
+    setIsScanning(true);
+    startScanner(useBackCamera);
+  }, [useBackCamera, startScanner]);
+
+  const handleFlipCamera = useCallback(async () => {
+    const newPref = !useBackCamera;
+    setUseBackCamera(newPref);
     
-    return () => { mounted = false; if (q) q.clear().catch(console.error); };
-  }, [isScanning, onScan]);
+    // Stop current scanner and restart with other camera
+    if (scannerRef.current) {
+      try { await scannerRef.current.stop(); } catch {}
+      try { scannerRef.current.clear(); } catch {}
+      scannerRef.current = null;
+    }
+    startScanner(newPref);
+  }, [useBackCamera, startScanner]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (scannerRef.current) {
+        scannerRef.current.stop().catch(() => {});
+        scannerRef.current.clear().catch(() => {});
+        scannerRef.current = null;
+      }
+    };
+  }, []);
 
   return (
     <div className="min-h-[100dvh] w-full bg-slate-900 flex flex-col">
       {/* Header */}
-      <div className="px-4 sm:px-6 pt-4 safe-top">
+      <div className="px-4 sm:px-6 pt-4 safe-top flex items-center justify-between">
         <button onClick={onBack} className="p-3 bg-white/10 text-white rounded-2xl hover:bg-white/20 active:scale-95 transition">
           <ChevronLeft className="w-5 h-5" />
         </button>
+        
+        {/* Camera flip button — only visible when scanning */}
+        {isScanning && (
+          <button
+            onClick={handleFlipCamera}
+            className="p-3 bg-white/10 text-white rounded-2xl hover:bg-white/20 active:scale-95 transition flex items-center gap-2"
+            title={useBackCamera ? "Switch to Front Camera" : "Switch to Back Camera"}
+          >
+            <SwitchCamera className="w-5 h-5" />
+            <span className="text-xs font-semibold hidden sm:inline">
+              {useBackCamera ? "Front" : "Back"}
+            </span>
+          </button>
+        )}
       </div>
 
       {/* Scanner area */}
       <div className="flex-1 flex flex-col items-center justify-center px-5 pb-8 safe-bottom">
-        <h2 className="text-white font-bold text-lg sm:text-xl mb-6 text-center">Scan Store QR Code</h2>
+        <h2 className="text-white font-bold text-lg sm:text-xl mb-2 text-center">Scan Store QR Code</h2>
+        {isScanning && (
+          <p className="text-slate-400 text-xs mb-5 flex items-center gap-1.5">
+            📷 {useBackCamera ? "Back camera" : "Front camera"}
+          </p>
+        )}
         
-        <div className="w-full max-w-[280px] sm:max-w-[320px] bg-white rounded-2xl sm:rounded-3xl overflow-hidden mb-8 relative p-3 sm:p-4 shadow-2xl">
+        <div className="w-full max-w-[280px] sm:max-w-[320px] bg-white rounded-2xl sm:rounded-3xl overflow-hidden mb-6 relative p-3 sm:p-4 shadow-2xl">
           <div id="reader" className="w-full text-slate-800" />
           {!isScanning && (
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-100 text-slate-400 rounded-2xl">
@@ -160,16 +246,37 @@ function ScanQRPage({ onScan, onBack }: any) {
         </div>
         
         {!isScanning && (
-          <button onClick={() => setIsScanning(true)} className="w-full max-w-[280px] sm:max-w-xs py-4 bg-rose-500 text-white font-bold rounded-2xl uppercase text-sm sm:text-base active:scale-[0.98] transition-all hover:bg-rose-600">
-            Start Scanner
-          </button>
+          <div className="w-full max-w-[280px] sm:max-w-xs space-y-3">
+            {/* Camera preference toggle */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => setUseBackCamera(true)}
+                className={`flex-1 py-3 rounded-xl font-bold text-xs transition-all active:scale-95 flex items-center justify-center gap-1.5 ${
+                  useBackCamera ? "bg-white text-slate-800" : "bg-white/10 text-slate-400"
+                }`}
+              >
+                📷 Back
+              </button>
+              <button
+                onClick={() => setUseBackCamera(false)}
+                className={`flex-1 py-3 rounded-xl font-bold text-xs transition-all active:scale-95 flex items-center justify-center gap-1.5 ${
+                  !useBackCamera ? "bg-white text-slate-800" : "bg-white/10 text-slate-400"
+                }`}
+              >
+                🤳 Front
+              </button>
+            </div>
+
+            <button onClick={handleStartScanning} className="w-full py-4 bg-rose-500 text-white font-bold rounded-2xl uppercase text-sm sm:text-base active:scale-[0.98] transition-all hover:bg-rose-600">
+              Start Scanner
+            </button>
+          </div>
         )}
       </div>
 
       <style dangerouslySetInnerHTML={{__html: `
         #reader { border: none !important; }
-        #reader button { background-color: #f43f5e !important; color: white !important; border: none !important; padding: 10px 16px !important; border-radius: 12px !important; font-weight: bold !important; margin: 10px 0 !important; font-size: 14px !important; }
-        #reader select { padding: 8px !important; border-radius: 8px !important; border: 1px solid #e2e8f0 !important; margin-bottom: 10px !important; width: 100% !important; font-size: 14px !important; }
+        #reader video { border-radius: 12px !important; }
         #reader img, #reader a { display: none !important; }
       `}} />
     </div>
