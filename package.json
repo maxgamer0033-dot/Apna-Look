@@ -4,7 +4,7 @@
     "private": true,
     "scripts": {
         "dev": "next dev --turbopack",
-        "build": "npx convex deploy --cmd \"next build\"",
+        "build": "npx convex deploy --yes --cmd \"next build\"",
         "start": "next start",
         "lint": "next lint",
         "ship": "git add . && git commit -m \"Auto-update\" && git push"
